@@ -9,8 +9,11 @@ import {
   saveWeightRecordLocal,
   getUserWeightRecordsLocal,
   markRecordAsSynced,
+  markRecordAsFailed,
   getPendingSyncRecords,
-  hasCheckedInTodayLocal
+  hasCheckedInTodayLocal,
+  validateLocalData,
+  clearCorruptedData
 } from '@/utils/weightStorage'
 
 export default function WeightLab() {
@@ -121,20 +124,38 @@ export default function WeightLab() {
   // 同步待同步的记录
   const syncPendingRecords = useCallback(async () => {
     const pendingRecords = getPendingSyncRecords(userId)
-    if (pendingRecords.length === 0) return
+    if (pendingRecords.length === 0) {
+      console.log('✓ 无待同步记录')
+      return
+    }
 
+    console.log(`开始同步 ${pendingRecords.length} 条待同步记录...`)
     showToast({ title: '正在同步...', icon: 'loading', duration: 0 })
 
     let successCount = 0
+    let failedCount = 0
+    
     for (const record of pendingRecords) {
       try {
+        console.log(`正在同步记录: ${record.record_date}, 体重: ${record.weight}kg`)
         const result = await recordWeight(userId, record.weight)
+        
         if (result.success) {
+          // 同步成功，标记为已同步
           markRecordAsSynced(userId, record.record_date)
           successCount++
+          console.log(`✓ 记录同步成功: ${record.record_date}`)
+        } else {
+          // 同步失败，标记为失败状态
+          markRecordAsFailed(userId, record.record_date)
+          failedCount++
+          console.log(`✗ 记录同步失败: ${record.record_date}, 原因: ${result.message}`)
         }
       } catch (error) {
-        console.error('同步记录失败:', error)
+        // 网络异常，标记为失败状态
+        markRecordAsFailed(userId, record.record_date)
+        failedCount++
+        console.error(`✗ 记录同步异常: ${record.record_date}`, error)
       }
     }
 
@@ -146,7 +167,11 @@ export default function WeightLab() {
         icon: 'success',
         duration: 2000
       })
-      setHasPendingSync(false)
+      
+      if (failedCount === 0) {
+        setHasPendingSync(false)
+      }
+      
       await loadData()
     } else {
       showToast({
@@ -155,26 +180,37 @@ export default function WeightLab() {
         duration: 2000
       })
     }
-  }, [userId])
+    
+    console.log(`同步完成: 成功 ${successCount} 条, 失败 ${failedCount} 条`)
+  }, [userId, loadData])
 
   // 加载数据（优先从本地加载，然后异步请求云端）
   const loadData = useCallback(async () => {
     console.log('=== 开始加载体重数据 ===')
     
-    // 1. 优先从本地存储加载数据
+    // 0. 验证本地数据完整性
+    const isValid = validateLocalData(userId)
+    if (!isValid) {
+      console.warn('⚠ 本地数据损坏，尝试清理...')
+      clearCorruptedData()
+    }
+    
+    // 1. 优先从本地存储加载数据（立即渲染）
     const localRecords = getUserWeightRecordsLocal(userId)
     if (localRecords.length > 0) {
-      console.log('从本地存储加载到', localRecords.length, '条记录')
+      console.log(`✓ 从本地存储加载到 ${localRecords.length} 条记录`)
       // 转换为WeightRecord格式
       const formattedRecords: WeightRecord[] = localRecords.map(r => ({
         id: r.id || '',
         user_id: r.user_id,
-        weight: r.weight.toString(),
+        weight: r.weight, // 支持number类型
         record_date: r.record_date,
         points_earned: 0,
         created_at: r.created_at
       }))
       setRecords(formattedRecords)
+    } else {
+      console.log('⚠ 本地存储无数据')
     }
 
     // 2. 异步请求云端数据
@@ -184,35 +220,48 @@ export default function WeightLab() {
         getUserWeightStats(userId)
       ])
 
-      console.log('从云端加载到', recordsData.length, '条记录')
+      console.log(`✓ 从云端加载到 ${recordsData.length} 条记录`)
 
       // 3. 对比并更新本地存储
       if (recordsData.length > 0) {
+        // 更新页面显示
         setRecords(recordsData)
         
-        // 更新本地存储（标记为已同步）
+        // 同步到本地存储（覆盖或新增）
         recordsData.forEach(record => {
+          const weightNum = typeof record.weight === 'string' ? parseFloat(record.weight) : record.weight
           saveWeightRecordLocal({
             id: record.id,
             user_id: record.user_id,
-            weight: parseFloat(record.weight),
+            weight: weightNum,
             record_date: record.record_date,
             synced: true,
-            created_at: record.created_at
+            sync_status: 'synced',
+            created_at: record.created_at,
+            updated_at: new Date().toISOString()
           })
         })
+        console.log('✓ 云端数据已同步到本地存储')
       }
 
       setStats(statsData)
       console.log('=== 数据加载完成 ===')
     } catch (error) {
-      console.error('从云端加载数据失败:', error)
+      console.error('✗ 从云端加载数据失败:', error)
       // 网络异常时，继续使用本地数据
-      showToast({
-        title: '网络异常，显示本地数据',
-        icon: 'none',
-        duration: 2000
-      })
+      if (localRecords.length > 0) {
+        showToast({
+          title: '网络异常，显示本地数据',
+          icon: 'none',
+          duration: 2000
+        })
+      } else {
+        showToast({
+          title: '网络异常，无法加载数据',
+          icon: 'none',
+          duration: 2000
+        })
+      }
     }
   }, [userId])
 
@@ -234,32 +283,58 @@ export default function WeightLab() {
 
     // 检查今天是否已打卡（先检查本地）
     if (hasCheckedInTodayLocal(userId)) {
-      showToast({ title: '今天已经打卡过了哦～明天再来吧！', icon: 'none' })
+      showToast({ title: '今天已经打卡过了哦～明天再来吧！', icon: 'none', duration: 2000 })
       return
     }
 
+    console.log('=== 开始体重打卡流程 ===')
     setLoading(true)
     const today = new Date().toISOString().split('T')[0]
     const now = new Date().toISOString()
 
-    // 1. 先保存到本地存储
+    // 步骤1：先写入本地存储（本地存储优先）
     const localRecord = {
       user_id: userId,
       weight: weightNum,
       record_date: today,
       synced: false,
-      created_at: now
+      sync_status: 'pending' as const,
+      created_at: now,
+      updated_at: now
     }
-    saveWeightRecordLocal(localRecord)
-    console.log('体重记录已保存到本地存储')
+    
+    const saveSuccess = saveWeightRecordLocal(localRecord)
+    
+    if (!saveSuccess) {
+      showToast({ title: '本地存储失败，请重试', icon: 'none', duration: 2000 })
+      setLoading(false)
+      return
+    }
+    
+    console.log('✓ 步骤1完成：数据已写入本地存储')
 
+    // 立即更新页面显示（显示本地数据）
+    const localRecords = getUserWeightRecordsLocal(userId)
+    const formattedRecords: WeightRecord[] = localRecords.map(r => ({
+      id: r.id || '',
+      user_id: r.user_id,
+      weight: r.weight,
+      record_date: r.record_date,
+      points_earned: 0,
+      created_at: r.created_at
+    }))
+    setRecords(formattedRecords)
+    setWeight('')
+
+    // 步骤2：异步同步到云端
     try {
-      // 2. 尝试同步到云端
+      console.log('✓ 步骤2开始：尝试同步到云端...')
       const result = await recordWeight(userId, weightNum)
       
       if (result.success) {
-        // 同步成功，标记为已同步
+        // 云端同步成功，更新本地同步状态
         markRecordAsSynced(userId, today)
+        console.log('✓ 步骤2完成：云端同步成功')
         
         showToast({
           title: '打卡成功！',
@@ -267,56 +342,38 @@ export default function WeightLab() {
           duration: 2000
         })
 
-        // 重新加载数据
-        setWeight('')
+        // 重新加载数据（包含云端数据）
         await loadData()
       } else {
-        // 同步失败，但数据已保存到本地
+        // 云端同步失败，但本地数据已保存
+        markRecordAsFailed(userId, today)
+        console.log('✗ 步骤2失败：云端同步失败，原因:', result.message)
+        
+        setHasPendingSync(true)
+        
         showModal({
           title: '提示',
-          content: '数据已暂存本地，将在网络恢复后自动同步',
+          content: '数据已保存到本地，将在网络恢复后自动同步',
           showCancel: false,
           confirmText: '知道了'
         })
-        
-        // 重新加载本地数据
-        setWeight('')
-        const localRecords = getUserWeightRecordsLocal(userId)
-        const formattedRecords: WeightRecord[] = localRecords.map(r => ({
-          id: r.id || '',
-          user_id: r.user_id,
-          weight: r.weight.toString(),
-          record_date: r.record_date,
-          points_earned: 0,
-          created_at: r.created_at
-        }))
-        setRecords(formattedRecords)
       }
     } catch (error) {
-      console.error('同步体重记录失败:', error)
+      // 网络异常，本地数据已保存
+      markRecordAsFailed(userId, today)
+      console.error('✗ 步骤2异常：网络异常', error)
       
-      // 网络异常，数据已保存到本地
+      setHasPendingSync(true)
+      
       showModal({
         title: '网络异常',
-        content: '数据已暂存本地，将在网络恢复后自动同步',
+        content: '数据已保存到本地，将在网络恢复后自动同步',
         showCancel: false,
         confirmText: '知道了'
       })
-      
-      // 重新加载本地数据
-      setWeight('')
-      const localRecords = getUserWeightRecordsLocal(userId)
-      const formattedRecords: WeightRecord[] = localRecords.map(r => ({
-        id: r.id || '',
-        user_id: r.user_id,
-        weight: r.weight.toString(),
-        record_date: r.record_date,
-        points_earned: 0,
-        created_at: r.created_at
-      }))
-      setRecords(formattedRecords)
     } finally {
       setLoading(false)
+      console.log('=== 体重打卡流程结束 ===')
     }
   }
 
