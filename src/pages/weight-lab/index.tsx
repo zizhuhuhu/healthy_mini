@@ -5,6 +5,13 @@ import { hasCompletedTest } from '@/utils/storage'
 import { recordWeight, getUserWeightRecords, getUserWeightStats } from '@/db/api'
 import type { WeightRecord, WeightCheckinStats } from '@/db/types'
 import WeightChart from '@/components/WeightChart'
+import {
+  saveWeightRecordLocal,
+  getUserWeightRecordsLocal,
+  markRecordAsSynced,
+  getPendingSyncRecords,
+  hasCheckedInTodayLocal
+} from '@/utils/weightStorage'
 
 export default function WeightLab() {
   useShareAppMessage(() => ({ title: '健康实验室 - 智体云衡' }))
@@ -17,6 +24,7 @@ export default function WeightLab() {
   const [stats, setStats] = useState<WeightCheckinStats | null>(null)
   const [showGuide, setShowGuide] = useState(false)
   const [timeRange, setTimeRange] = useState<'7' | '30' | 'all'>('7')
+  const [hasPendingSync, setHasPendingSync] = useState(false)
 
   const showGuideDialog = useCallback(() => {
     showModal({
@@ -76,6 +84,7 @@ export default function WeightLab() {
   useDidShow(() => {
     loadData()
     checkFirstVisit()
+    checkPendingSync()
   })
 
   const checkFirstVisit = useCallback(async () => {
@@ -89,14 +98,122 @@ export default function WeightLab() {
     }
   }, [showGuideDialog])
 
-  const loadData = useCallback(async () => {
-    const [recordsData, statsData] = await Promise.all([
-      getUserWeightRecords(userId),
-      getUserWeightStats(userId)
-    ])
+  // 检查是否有待同步的记录
+  const checkPendingSync = useCallback(async () => {
+    const pendingRecords = getPendingSyncRecords(userId)
+    if (pendingRecords.length > 0) {
+      setHasPendingSync(true)
+      // 提示用户有未同步的记录
+      showModal({
+        title: '发现未同步的体重记录',
+        content: `您有 ${pendingRecords.length} 条体重记录未同步到云端，是否立即同步？`,
+        confirmText: '立即同步',
+        cancelText: '稍后同步',
+        success: async (res) => {
+          if (res.confirm) {
+            await syncPendingRecords()
+          }
+        }
+      })
+    }
+  }, [userId])
 
-    setRecords(recordsData)
-    setStats(statsData)
+  // 同步待同步的记录
+  const syncPendingRecords = useCallback(async () => {
+    const pendingRecords = getPendingSyncRecords(userId)
+    if (pendingRecords.length === 0) return
+
+    showToast({ title: '正在同步...', icon: 'loading', duration: 0 })
+
+    let successCount = 0
+    for (const record of pendingRecords) {
+      try {
+        const result = await recordWeight(userId, record.weight)
+        if (result.success) {
+          markRecordAsSynced(userId, record.record_date)
+          successCount++
+        }
+      } catch (error) {
+        console.error('同步记录失败:', error)
+      }
+    }
+
+    Taro.hideToast()
+
+    if (successCount > 0) {
+      showToast({
+        title: `成功同步 ${successCount} 条记录`,
+        icon: 'success',
+        duration: 2000
+      })
+      setHasPendingSync(false)
+      await loadData()
+    } else {
+      showToast({
+        title: '同步失败，请稍后重试',
+        icon: 'none',
+        duration: 2000
+      })
+    }
+  }, [userId])
+
+  // 加载数据（优先从本地加载，然后异步请求云端）
+  const loadData = useCallback(async () => {
+    console.log('=== 开始加载体重数据 ===')
+    
+    // 1. 优先从本地存储加载数据
+    const localRecords = getUserWeightRecordsLocal(userId)
+    if (localRecords.length > 0) {
+      console.log('从本地存储加载到', localRecords.length, '条记录')
+      // 转换为WeightRecord格式
+      const formattedRecords: WeightRecord[] = localRecords.map(r => ({
+        id: r.id || '',
+        user_id: r.user_id,
+        weight: r.weight.toString(),
+        record_date: r.record_date,
+        points_earned: 0,
+        created_at: r.created_at
+      }))
+      setRecords(formattedRecords)
+    }
+
+    // 2. 异步请求云端数据
+    try {
+      const [recordsData, statsData] = await Promise.all([
+        getUserWeightRecords(userId),
+        getUserWeightStats(userId)
+      ])
+
+      console.log('从云端加载到', recordsData.length, '条记录')
+
+      // 3. 对比并更新本地存储
+      if (recordsData.length > 0) {
+        setRecords(recordsData)
+        
+        // 更新本地存储（标记为已同步）
+        recordsData.forEach(record => {
+          saveWeightRecordLocal({
+            id: record.id,
+            user_id: record.user_id,
+            weight: parseFloat(record.weight),
+            record_date: record.record_date,
+            synced: true,
+            created_at: record.created_at
+          })
+        })
+      }
+
+      setStats(statsData)
+      console.log('=== 数据加载完成 ===')
+    } catch (error) {
+      console.error('从云端加载数据失败:', error)
+      // 网络异常时，继续使用本地数据
+      showToast({
+        title: '网络异常，显示本地数据',
+        icon: 'none',
+        duration: 2000
+      })
+    }
   }, [userId])
 
   const handleShowGuide = () => {
@@ -115,12 +232,35 @@ export default function WeightLab() {
       return
     }
 
+    // 检查今天是否已打卡（先检查本地）
+    if (hasCheckedInTodayLocal(userId)) {
+      showToast({ title: '今天已经打卡过了哦～明天再来吧！', icon: 'none' })
+      return
+    }
+
     setLoading(true)
+    const today = new Date().toISOString().split('T')[0]
+    const now = new Date().toISOString()
+
+    // 1. 先保存到本地存储
+    const localRecord = {
+      user_id: userId,
+      weight: weightNum,
+      record_date: today,
+      synced: false,
+      created_at: now
+    }
+    saveWeightRecordLocal(localRecord)
+    console.log('体重记录已保存到本地存储')
+
     try {
+      // 2. 尝试同步到云端
       const result = await recordWeight(userId, weightNum)
       
       if (result.success) {
-        // 打卡成功提示
+        // 同步成功，标记为已同步
+        markRecordAsSynced(userId, today)
+        
         showToast({
           title: '打卡成功！',
           icon: 'success',
@@ -131,11 +271,50 @@ export default function WeightLab() {
         setWeight('')
         await loadData()
       } else {
-        showToast({ title: result.message, icon: 'none' })
+        // 同步失败，但数据已保存到本地
+        showModal({
+          title: '提示',
+          content: '数据已暂存本地，将在网络恢复后自动同步',
+          showCancel: false,
+          confirmText: '知道了'
+        })
+        
+        // 重新加载本地数据
+        setWeight('')
+        const localRecords = getUserWeightRecordsLocal(userId)
+        const formattedRecords: WeightRecord[] = localRecords.map(r => ({
+          id: r.id || '',
+          user_id: r.user_id,
+          weight: r.weight.toString(),
+          record_date: r.record_date,
+          points_earned: 0,
+          created_at: r.created_at
+        }))
+        setRecords(formattedRecords)
       }
     } catch (error) {
-      console.error('记录体重失败:', error)
-      showToast({ title: '记录失败，请重试', icon: 'none' })
+      console.error('同步体重记录失败:', error)
+      
+      // 网络异常，数据已保存到本地
+      showModal({
+        title: '网络异常',
+        content: '数据已暂存本地，将在网络恢复后自动同步',
+        showCancel: false,
+        confirmText: '知道了'
+      })
+      
+      // 重新加载本地数据
+      setWeight('')
+      const localRecords = getUserWeightRecordsLocal(userId)
+      const formattedRecords: WeightRecord[] = localRecords.map(r => ({
+        id: r.id || '',
+        user_id: r.user_id,
+        weight: r.weight.toString(),
+        record_date: r.record_date,
+        points_earned: 0,
+        created_at: r.created_at
+      }))
+      setRecords(formattedRecords)
     } finally {
       setLoading(false)
     }
@@ -233,9 +412,20 @@ export default function WeightLab() {
 
           {/* 体重记录区域 */}
           <View className="bg-card rounded-2xl p-6 mb-6 border border-border">
-            <View className="flex flex-row items-center mb-4">
-              <View className="i-mdi-scale-bathroom text-2xl text-primary mr-2" />
-              <Text className="text-2xl font-semibold text-foreground">记录我的体重</Text>
+            <View className="flex flex-row items-center justify-between mb-4">
+              <View className="flex flex-row items-center">
+                <View className="i-mdi-scale-bathroom text-2xl text-primary mr-2" />
+                <Text className="text-2xl font-semibold text-foreground">记录我的体重</Text>
+              </View>
+              {hasPendingSync && (
+                <View
+                  className="flex flex-row items-center bg-warning/10 px-3 py-1 rounded-lg active-press"
+                  onClick={syncPendingRecords}
+                >
+                  <View className="i-mdi-cloud-upload text-lg text-warning mr-1" />
+                  <Text className="text-sm text-warning">待同步</Text>
+                </View>
+              )}
             </View>
 
             <View className="flex flex-col space-y-4">
