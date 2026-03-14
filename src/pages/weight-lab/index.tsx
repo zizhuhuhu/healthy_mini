@@ -120,23 +120,12 @@ export default function WeightLab() {
       const result = await recordWeight(userId, weightNum)
       
       if (result.success) {
-        // 打卡成功动画
+        // 打卡成功提示
         showToast({
-          title: `打卡成功！+${result.pointsEarned}积分`,
+          title: '打卡成功！',
           icon: 'success',
           duration: 2000
         })
-
-        // 如果有连续打卡奖励
-        if (result.bonusPoints && result.bonusPoints > 0) {
-          setTimeout(() => {
-            showToast({
-              title: `连续${result.currentStreak}天！额外+${result.bonusPoints}积分`,
-              icon: 'success',
-              duration: 2000
-            })
-          }, 2000)
-        }
 
         // 重新加载数据
         setWeight('')
@@ -224,20 +213,15 @@ export default function WeightLab() {
                   <Text className="text-xl text-primary-foreground/80">天</Text>
                 </View>
                 <View className="flex flex-col space-y-1 items-end">
-                  <Text className="text-xl text-primary-foreground/80">总积分</Text>
+                  <Text className="text-xl text-primary-foreground/80">总打卡</Text>
                   <Text className="text-5xl font-extrabold text-primary-foreground">
-                    {stats?.total_points || 0}
+                    {stats?.total_checkins || 0}
                   </Text>
+                  <Text className="text-xl text-primary-foreground/80">次</Text>
                 </View>
               </View>
-              <View className="flex flex-row items-center justify-between pt-4 border-t border-primary-foreground/20">
-                <View className="flex flex-col space-y-1">
-                  <Text className="text-lg text-primary-foreground/80">总打卡</Text>
-                  <Text className="text-2xl font-bold text-primary-foreground">
-                    {stats?.total_checkins || 0}次
-                  </Text>
-                </View>
-                <View className="flex flex-col space-y-1 items-end">
+              <View className="flex flex-row items-center justify-center pt-4 border-t border-primary-foreground/20">
+                <View className="flex flex-col space-y-1 items-center">
                   <Text className="text-lg text-primary-foreground/80">最长连续</Text>
                   <Text className="text-2xl font-bold text-primary-foreground">
                     {stats?.max_streak || 0}天

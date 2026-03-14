@@ -503,7 +503,7 @@ export async function recordWeight(userId: string, weight: number): Promise<impo
       }
     }
 
-    // 2. 插入体重记录
+    // 2. 插入体重记录（不记录积分）
     const { error: insertError } = await supabase
       .from('weight_records')
       .insert({
@@ -549,7 +549,6 @@ export async function recordWeight(userId: string, weight: number): Promise<impo
 
     // 4. 计算连续打卡天数
     let currentStreak = 1
-    let bonusPoints = 0
     const lastCheckinDate = stats?.last_checkin_date
 
     if (lastCheckinDate) {
@@ -566,66 +565,28 @@ export async function recordWeight(userId: string, weight: number): Promise<impo
       }
     }
 
-    // 5. 计算奖励积分
-    const basePoints = 1 // 基础积分
-    if (currentStreak === 3) {
-      bonusPoints = 3
-    } else if (currentStreak === 7) {
-      bonusPoints = 5
-    } else if (currentStreak === 14) {
-      bonusPoints = 10
-    } else if (currentStreak === 30) {
-      bonusPoints = 20
-    }
-
-    const totalPointsEarned = basePoints + bonusPoints
-    const newTotalPoints = (stats?.total_points || 0) + totalPointsEarned
-
-    // 6. 更新打卡统计
+    // 5. 更新打卡统计（不更新积分）
     await supabase
       .from('weight_checkin_stats')
       .update({
         current_streak: currentStreak,
         max_streak: Math.max(currentStreak, stats?.max_streak || 0),
         total_checkins: (stats?.total_checkins || 0) + 1,
-        total_points: newTotalPoints,
         last_checkin_date: today,
         updated_at: new Date().toISOString()
       })
       .eq('user_id', userId)
 
-    // 7. 检查并解锁成就
-    const newAchievements = await checkAndUnlockAchievements(userId, currentStreak, (stats?.total_checkins || 0) + 1)
-
-    // 8. 添加成就积分到总积分
-    const achievementPoints = newAchievements.reduce((sum, ach) => sum + ach.points_reward, 0)
-    if (achievementPoints > 0) {
-      await supabase
-        .from('weight_checkin_stats')
-        .update({
-          total_points: newTotalPoints + achievementPoints
-        })
-        .eq('user_id', userId)
-    }
-
-    // 9. 同步到user_points表
-    const { error: pointsError } = await supabase.rpc('add_user_points', {
-      p_user_id: userId,
-      p_points: totalPointsEarned + achievementPoints
-    })
-
-    if (pointsError) {
-      console.error('同步积分失败:', pointsError)
-    }
+    console.log('体重打卡成功，不记录积分')
 
     return {
       success: true,
       message: '打卡成功！',
-      pointsEarned: basePoints,
-      bonusPoints: bonusPoints + achievementPoints,
+      pointsEarned: 0,
+      bonusPoints: 0,
       currentStreak,
-      totalPoints: newTotalPoints + achievementPoints,
-      newAchievements
+      totalPoints: 0,
+      newAchievements: []
     }
   } catch (error) {
     console.error('体重打卡失败:', error)
