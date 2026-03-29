@@ -1,16 +1,16 @@
 import { View, Text, ScrollView } from '@tarojs/components'
 import { useState, useCallback, useEffect } from 'react'
-import { useShareAppMessage, useShareTimeline, useDidShow, switchTab } from '@tarojs/taro'
+import { useShareAppMessage, useShareTimeline, useDidShow, switchTab, getStorageSync, setStorageSync } from '@tarojs/taro'
 import { getPointsRanking, getUserPoints } from '@/db/api'
 import type { UserPoints } from '@/db/types'
 import CheckInButton from '@/components/CheckInButton'
 
 // 生成用户ID
 const getUserId = () => {
-  let userId = localStorage.getItem('temp_user_id')
+  let userId = getStorageSync('temp_user_id')
   if (!userId) {
     userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
-    localStorage.setItem('temp_user_id', userId)
+    setStorageSync('temp_user_id', userId)
   }
   return userId
 }

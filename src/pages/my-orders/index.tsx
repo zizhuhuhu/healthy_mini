@@ -1,16 +1,16 @@
 import { View, Text, ScrollView, Button } from '@tarojs/components'
 import { useState, useCallback, useEffect } from 'react'
-import { useShareAppMessage, useShareTimeline, navigateTo, useDidShow } from '@tarojs/taro'
+import { useShareAppMessage, useShareTimeline, navigateTo, useDidShow, getStorageSync, setStorageSync } from '@tarojs/taro'
 import { getUserOrders } from '@/db/api'
 import type { DeliveryOrder } from '@/db/types'
 import QuickNav from '@/components/QuickNav'
 
 // 生成用户ID（实际应用中应该从登录系统获取）
 const getUserId = () => {
-  let userId = localStorage.getItem('temp_user_id')
+  let userId = getStorageSync('temp_user_id')
   if (!userId) {
     userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
-    localStorage.setItem('temp_user_id', userId)
+    setStorageSync('temp_user_id', userId)
   }
   return userId
 }

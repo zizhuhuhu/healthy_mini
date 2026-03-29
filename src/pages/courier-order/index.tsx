@@ -1,15 +1,15 @@
 import { View, Text, ScrollView, Button, Input, Textarea, Picker } from '@tarojs/components'
 import { useState } from 'react'
-import { useShareAppMessage, useShareTimeline, showToast, navigateTo } from '@tarojs/taro'
+import { useShareAppMessage, useShareTimeline, showToast, navigateTo, getStorageSync, setStorageSync } from '@tarojs/taro'
 import { createDeliveryOrder } from '@/db/api'
 import QuickNav from '@/components/QuickNav'
 
 // 生成用户ID（实际应用中应该从登录系统获取）
 const getUserId = () => {
-  let userId = localStorage.getItem('temp_user_id')
+  let userId = getStorageSync('temp_user_id')
   if (!userId) {
     userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
-    localStorage.setItem('temp_user_id', userId)
+    setStorageSync('temp_user_id', userId)
   }
   return userId
 }

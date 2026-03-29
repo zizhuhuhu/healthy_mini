@@ -1,16 +1,16 @@
 import { View, Text, ScrollView, Button } from '@tarojs/components'
 import { useState, useCallback, useEffect } from 'react'
-import { useShareAppMessage, useShareTimeline, showToast, useDidShow } from '@tarojs/taro'
+import { useShareAppMessage, useShareTimeline, showToast, useDidShow, getStorageSync, setStorageSync } from '@tarojs/taro'
 import { getPendingOrders, acceptOrder, getCourierOrders, getCourierEarnings } from '@/db/api'
 import type { DeliveryOrder } from '@/db/types'
 import QuickNav from '@/components/QuickNav'
 
 // 生成跑腿ID（实际应用中应该从登录系统获取）
 const getCourierId = () => {
-  let courierId = localStorage.getItem('temp_courier_id')
+  let courierId = getStorageSync('temp_courier_id')
   if (!courierId) {
     courierId = 'courier_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
-    localStorage.setItem('temp_courier_id', courierId)
+    setStorageSync('temp_courier_id', courierId)
   }
   return courierId
 }

@@ -1,16 +1,24 @@
 import { View, Text, Image } from '@tarojs/components'
 import { useState, useCallback, useEffect } from 'react'
-import { useShareAppMessage, useShareTimeline, navigateTo, switchTab, useDidShow } from '@tarojs/taro'
+import {
+  useShareAppMessage,
+  useShareTimeline,
+  navigateTo,
+  switchTab,
+  useDidShow,
+  getStorageSync,
+  setStorageSync
+} from '@tarojs/taro'
 import { useTabBarPageClass } from '@/hooks/useTabBarPageClass'
 import { getUserPoints } from '@/db/api'
 import CheckInButton from '@/components/CheckInButton'
 
 // 生成用户ID
 const getUserId = () => {
-  let userId = localStorage.getItem('temp_user_id')
+  let userId = getStorageSync('temp_user_id')
   if (!userId) {
     userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
-    localStorage.setItem('temp_user_id', userId)
+    setStorageSync('temp_user_id', userId)
   }
   return userId
 }
@@ -336,3 +344,6 @@ export default function Home() {
     </View>
   );
 }
+
+
+  
