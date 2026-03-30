@@ -3,6 +3,8 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { useShareAppMessage, useShareTimeline, navigateTo, switchTab, showToast } from '@tarojs/taro'
 import { getUserConstitution, hasCompletedTest } from '@/utils/storage'
 import { checkUserMembership } from '@/db/api'
+import { withRouteGuard } from '@/components/RouteGuard'
+import { getCurrentUserId } from '@/utils/user'
 import { sendChatStream } from 'miaoda-taro-utils/chatStream'
 import QuickNav from '@/components/QuickNav'
 import CheckInButton from '@/components/CheckInButton'
@@ -15,25 +17,25 @@ const getRecommendedQuestions = (constitutionType: string): string[] => {
     '我的体质适合吃什么食物？',
     '我应该避免哪些食物？',
     '适合我的运动方式有哪些？',
-    '如何改善我的体质？'
+    '如何改善我的体质'
   ]
 
   const specificQuestions: Record<string, string[]> = {
-    '气虚质': ['如何增强体质？', '适合吃什么补气食物？', '容易疲劳怎么办？'],
-    '阳虚质': ['如何改善怕冷？', '适合什么温补食物？', '冬天如何保暖？'],
-    '阴虚质': ['如何缓解口干？', '适合吃什么滋阴食物？', '晚上睡不好怎么办？'],
-    '痰湿质': ['如何减肥？', '适合吃什么祛湿食物？', '如何改善水肿？'],
-    '湿热质': ['如何清热？', '需要避免什么食物？', '如何改善口苦？'],
-    '血瘀质': ['如何活血？', '适合什么运动？', '如何改善气色？'],
-    '气郁质': ['如何调节情绪？', '适合吃什么疏肝食物？', '如何缓解压力？'],
-    '特禀质': ['如何预防过敏？', '需要注意什么？', '如何增强免疫力？'],
-    '平和质': ['如何保持健康？', '日常饮食建议？', '如何预防疾病？']
+    '气虚': ['如何增强体质?', '适合吃什么补气食物？', '容易疲劳怎么办？'],
+    '阳虚': ['如何改善怕冷?', '适合什么温补食物？', '冬天如何保暖?'],
+    '阴虚': ['如何缓解口干?', '适合吃什么滋阴食物？', '晚上睡不好怎么办？'],
+    '痰湿': ['如何减肥?', '适合吃什么祛湿食物？', '如何改善水肿?'],
+    '湿热': ['如何清热?', '需要避免什么食物？', '如何改善口苦?'],
+    '血瘀': ['如何活血?', '适合什么运动？', '如何改善气色?'],
+    '气郁': ['如何调节情绪?', '适合吃什么疏肝食物？', '如何缓解压力?'],
+    '特禀': ['如何预防过敏?', '需要注意什么？', '如何增强免疫力？'],
+    '平和': ['如何保持健康?', '日常饮食建议?', '如何预防疾病?']
   }
 
   return [...(specificQuestions[constitutionType] || []), ...commonQuestions].slice(0, 6)
 }
 
-export default function AIAdvisor() {
+function AIAdvisor() {
   useShareAppMessage(() => ({ title: 'AI健康顾问 - 智体云衡' }))
   useShareTimeline(() => ({ title: 'AI健康顾问 - 智体云衡' }))
 
@@ -46,16 +48,16 @@ export default function AIAdvisor() {
   const [isResponding, setIsResponding] = useState(false)
   const [recommendedQuestions, setRecommendedQuestions] = useState<string[]>([])
   
-  // 使用ref保存当前AI回复的完整内容
+  // 使用ref保存当前AI回复的完整内容  
   const currentResponseRef = useRef('')
-  // 使用state显示正在生成的内容
+  // 使用state显示正在生成的内容  
   const [streamingContent, setStreamingContent] = useState('')
 
-  // 检查用户状态
+  // 检查用户状态  
   const checkStatus = useCallback(async () => {
     setLoading(true)
 
-    // 检查是否完成体质测试
+    // 检查是否完成体质测试?    
     const completed = hasCompletedTest()
     setHasTest(completed)
 
@@ -64,9 +66,13 @@ export default function AIAdvisor() {
       return
     }
 
-    // 检查会员状态（使用测试用户ID）
-    const userData = getUserConstitution()
-    const userId = 'test_user_001' // 实际应用中应该使用真实的用户ID
+   
+    const userId = getCurrentUserId()
+    if (!userId) {
+      setIsMember(false)
+      setLoading(false)
+      return
+    }
     const membership = await checkUserMembership(userId)
     setIsMember(membership?.is_active || false)
 
@@ -78,7 +84,7 @@ export default function AIAdvisor() {
   }, [checkStatus])
 
   const handleGoToTest = () => {
-    navigateTo({ url: '/pages/constitution-test/index' })
+    switchTab({ url: '/pages/constitution-test/index' })
   }
 
   const handleOpenMembership = () => {
@@ -96,7 +102,7 @@ export default function AIAdvisor() {
       return
     }
 
-    // 构建系统提示词
+    // 构建系统提示    
     const systemMessage = {
       role: 'system' as const,
       content: `你是一位精通中医体质学和体重管理的健康顾问。
@@ -117,8 +123,8 @@ export default function AIAdvisor() {
     setChatStarted(true)
   }
 
-  // 发送消息（支持直接传入问题文本）
-  const handleSendMessage = useCallback((questionText?: string) => {
+  // 发送消息（支持直接传入问题文本 
+    const handleSendMessage = useCallback((questionText?: string) => {
     const textToSend = questionText || inputText.trim()
     
     if (!textToSend || isResponding) {
@@ -189,11 +195,11 @@ export default function AIAdvisor() {
     <View className="min-h-screen bg-background">
       <ScrollView className="w-full" scrollY>
         <View className="px-4 py-6">
-          {/* 顶部：返回首页按钮 + 签到按钮 */}
+          {/* 顶部：返回首页按�?+ 签到按钮 */}
           <View className="flex flex-row items-center justify-between mb-6">
             <View
               className="flex flex-row items-center bg-card rounded-full px-5 py-2 border border-border shadow-sm"
-              onClick={() => switchTab({ url: '/pages/home/index' })}
+              onClick={() => navigateTo({ url: '/pages/home/index' })}
             >
               <View className="i-mdi-home text-2xl text-primary mr-1" />
               <Text className="text-xl font-medium text-foreground">首页</Text>
@@ -236,7 +242,7 @@ export default function AIAdvisor() {
             </View>
           </View>
 
-          {/* 加载状态 */}
+          {/* 加载状�?*/}
           {loading && (
             <View className="flex flex-col items-center py-12">
               <View className="i-mdi-loading animate-spin text-5xl text-primary mb-4" />
@@ -276,8 +282,7 @@ export default function AIAdvisor() {
                   开通会员享受AI服务
                 </Text>
                 <Text className="text-xl text-muted-foreground text-center">
-                  AI健康顾问是会员专享功能，开通后即可享受专业的健康咨询服务
-                </Text>
+                  AI健康顾问是会员专享功能，开通后即可享受专业的健康咨询服务               </Text>
 
                 {/* 会员权益 */}
                 <View className="w-full bg-muted rounded-xl p-4 mt-4">
@@ -304,7 +309,7 @@ export default function AIAdvisor() {
                     <View className="flex flex-row items-start">
                       <View className="i-mdi-check-circle text-xl text-primary mr-2 mt-1" />
                       <Text className="flex-1 text-xl text-foreground">
-                        对话历史保存，随时查看
+                        对话历史保存，随时查询
                       </Text>
                     </View>
                   </View>
@@ -322,7 +327,7 @@ export default function AIAdvisor() {
             </View>
           )}
 
-          {/* 已开通会员 - 显示对话界面 */}
+          {/* 已开通会员显示对话界面 */}
           {!loading && hasTest && isMember && (
             <View className="flex flex-col space-y-4">
               {!chatStarted ? (
@@ -523,3 +528,6 @@ export default function AIAdvisor() {
     </View>
   );
 }
+
+export default withRouteGuard(AIAdvisor)
+

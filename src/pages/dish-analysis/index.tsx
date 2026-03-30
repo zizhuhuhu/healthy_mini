@@ -1,11 +1,12 @@
 import { View, Text, ScrollView, Image, Input, Button, RichText } from '@tarojs/components'
 import { useState, useCallback } from 'react'
-import Taro, { useShareAppMessage, useShareTimeline, chooseImage, showToast, navigateTo, switchTab } from '@tarojs/taro'
+import { useShareAppMessage, useShareTimeline, chooseImage, showToast, navigateTo } from '@tarojs/taro'
 import { getUserConstitution, hasCompletedTest } from '@/utils/storage'
 import { imageToBase64, compressImage } from '@/utils/imageUtils'
 import { sendChatStream } from 'miaoda-taro-utils/chatStream'
 import { saveDishAnalysisRecord } from '@/db/api'
 import CheckInButton from '@/components/CheckInButton'
+import { getCurrentUserId } from '@/utils/user'
 
 const supabaseUrl = process.env.TARO_APP_SUPABASE_URL
 
@@ -107,6 +108,16 @@ export default function DishAnalysis() {
       return
     }
 
+    const userId = getCurrentUserId()
+    if (!userId) {
+      showToast({
+        title: '请先登录后再分析',
+        icon: 'none',
+        duration: 2000
+      })
+      return
+    }
+
     setAnalyzing(true)
     setAnalysisResult('')
     setShowResult(false)
@@ -177,7 +188,7 @@ export default function DishAnalysis() {
           // 保存分析记录到数据库
           try {
             await saveDishAnalysisRecord({
-              user_id: 'test_user_001',
+              user_id: userId,
               dish_image_url: imageUrl,
               dish_name: dishName,
               ingredients,
@@ -236,7 +247,7 @@ export default function DishAnalysis() {
           <View className="flex flex-row items-center justify-between mb-6">
             <View
               className="flex flex-row items-center bg-card rounded-full px-5 py-2 border border-border shadow-sm"
-              onClick={() => switchTab({ url: '/pages/home/index' })}
+              onClick={() => navigateTo({ url: '/pages/home/index' })}
             >
               <View className="i-mdi-home text-2xl text-primary mr-1" />
               <Text className="text-xl font-medium text-foreground">首页</Text>

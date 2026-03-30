@@ -1,15 +1,16 @@
 import { View, Text, ScrollView, Button, Image } from '@tarojs/components'
 import { useState, useCallback } from 'react'
-import Taro, { useShareAppMessage, useShareTimeline, useDidShow, navigateTo, switchTab, showToast, showModal } from '@tarojs/taro'
+import { useShareAppMessage, useShareTimeline, useDidShow, navigateTo, switchTab, showToast, showModal } from '@tarojs/taro'
 import { getAllVirtualItems, getUserItems, purchaseVirtualItem, toggleItemActive, getUserWeightStats } from '@/db/api'
 import type { VirtualItem, WeightCheckinStats } from '@/db/types'
 import CheckInButton from '@/components/CheckInButton'
+import { getCurrentUserId } from '@/utils/user'
 
 export default function PointsShop() {
   useShareAppMessage(() => ({ title: '积分商城 - 智体云衡' }))
   useShareTimeline(() => ({ title: '积分商城 - 智体云衡' }))
 
-  const [userId] = useState(() => Taro.getStorageSync('user_id') || `user_${Date.now()}`)
+  const [userId] = useState(() => getCurrentUserId())
   const [allItems, setAllItems] = useState<VirtualItem[]>([])
   const [userItems, setUserItems] = useState<Array<VirtualItem & { is_active: boolean }>>([])
   const [stats, setStats] = useState<WeightCheckinStats | null>(null)
@@ -20,6 +21,12 @@ export default function PointsShop() {
   })
 
   const loadData = useCallback(async () => {
+    if (!userId) {
+      setAllItems([])
+      setUserItems([])
+      setStats(null)
+      return
+    }
     const [itemsData, userItemsData, statsData] = await Promise.all([
       getAllVirtualItems(),
       getUserItems(userId),
@@ -32,6 +39,10 @@ export default function PointsShop() {
   }, [userId])
 
   const handlePurchase = async (item: VirtualItem) => {
+    if (!userId) {
+      showToast({ title: '请先登录后再购买', icon: 'none' })
+      return
+    }
     if (!stats || stats.total_points < item.price) {
       showToast({ title: '积分不足', icon: 'none' })
       return
@@ -55,6 +66,10 @@ export default function PointsShop() {
   }
 
   const handleToggleActive = async (item: VirtualItem & { is_active: boolean }) => {
+    if (!userId) {
+      showToast({ title: '请先登录后再操作', icon: 'none' })
+      return
+    }
     const result = await toggleItemActive(userId, item.id, item.type)
     if (result.success) {
       showToast({ title: result.message, icon: 'success' })
@@ -65,11 +80,11 @@ export default function PointsShop() {
   }
 
   const handleNavigateToHome = () => {
-    switchTab({ url: '/pages/home/index' })
+    navigateTo({ url: '/pages/home/index' })
   }
 
   const handleNavigateToWeightLab = () => {
-    navigateTo({ url: '/pages/weight-lab/index' })
+    switchTab({ url: '/pages/weight-lab/index' })
   }
 
   const userItemIds = new Set(userItems.map(item => item.id))

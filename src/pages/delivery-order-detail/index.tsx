@@ -4,17 +4,9 @@ import Taro, { useShareAppMessage, useShareTimeline, useDidShow, navigateBack, g
 import { confirmDeliveryExpressOrder } from '@/db/deliveryApi'
 import { supabase } from '@/client/supabase'
 import type { DeliveryExpressOrder } from '@/db/types'
+import { getCurrentUserId } from '@/utils/user'
 
 // 生成用户ID
-const getUserId = () => {
-  let userId = Taro.getStorageSync('temp_user_id')
-  if (!userId) {
-    userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
-    Taro.setStorageSync('temp_user_id', userId)
-  }
-  return userId
-}
-
 // 订单状态配置
 const ORDER_STATUS = {
   pending: { name: '待接单', color: 'text-yellow-600', bgColor: 'bg-yellow-100' },
@@ -30,7 +22,7 @@ export default function DeliveryOrderDetail() {
 
   const instance = getCurrentInstance()
   const orderId = instance.router?.params?.id || ''
-  const [userId] = useState(() => getUserId())
+  const [userId] = useState(() => getCurrentUserId())
   const [order, setOrder] = useState<DeliveryExpressOrder | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -72,6 +64,10 @@ export default function DeliveryOrderDetail() {
   // 确认完成
   const handleConfirm = async () => {
     if (!order) return
+    if (!userId) {
+      Taro.showToast({ title: '请先登录后再操作', icon: 'none' })
+      return
+    }
 
     const role = order.requester_id === userId ? 'requester' : 'helper'
     const result = await confirmDeliveryExpressOrder(order.id, userId, role)

@@ -13,7 +13,8 @@ export default function QuickNav() {
     { icon: 'i-mdi-crown', text: '会员中心', url: '/pages/membership/index', isTab: false },
     { icon: 'i-mdi-receipt-text', text: '我的订单', url: '/pages/my-orders/index', isTab: false },
     { icon: 'i-mdi-run-fast', text: '发布跑腿', url: '/pages/courier-order/index', isTab: false },
-    { icon: 'i-mdi-bike-fast', text: '接单中心', url: '/pages/courier-center/index', isTab: false }
+    { icon: 'i-mdi-bike-fast', text: '接单中心', url: '/pages/courier-center/index', isTab: false },
+    { icon: 'i-mdi-account-circle', text: '个人中心', url: '/pages/profile/index', isTab: false }
   ]
 
   const handleNav = (url: string, isTab: boolean) => {
@@ -48,3 +49,4 @@ export default function QuickNav() {
     </View>
   )
 }
+

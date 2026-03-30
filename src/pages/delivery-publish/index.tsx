@@ -2,17 +2,9 @@ import { View, Text, ScrollView, Input, Button, Picker } from '@tarojs/component
 import { useState } from 'react'
 import Taro, { useShareAppMessage, useShareTimeline, useDidShow, navigateBack, navigateTo } from '@tarojs/taro'
 import { createDeliveryExpressOrder, getOrCreateDeliveryUser } from '@/db/deliveryApi'
+import { getCurrentUserId } from '@/utils/user'
 
 // 生成用户ID
-const getUserId = () => {
-  let userId = Taro.getStorageSync('temp_user_id')
-  if (!userId) {
-    userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
-    Taro.setStorageSync('temp_user_id', userId)
-  }
-  return userId
-}
-
 // 常用取餐地点
 const PICKUP_LOCATIONS = [
   '五味食堂1楼',
@@ -44,7 +36,7 @@ export default function DeliveryPublish() {
   useShareAppMessage(() => ({ title: '发布需求 - 饮食速递' }))
   useShareTimeline(() => ({ title: '发布需求 - 饮食速递' }))
 
-  const [userId] = useState(() => getUserId())
+  const [userId] = useState(() => getCurrentUserId())
   const [pickupLocation, setPickupLocation] = useState('')
   const [pickupLocationIndex, setPickupLocationIndex] = useState(0)
   const [deliveryLocation, setDeliveryLocation] = useState('')
@@ -60,6 +52,9 @@ export default function DeliveryPublish() {
 
   // 加载用户信息
   useDidShow(async () => {
+    if (!userId) {
+      return
+    }
     const user = await getOrCreateDeliveryUser(userId)
     setUserInfo(user)
     
@@ -86,6 +81,10 @@ export default function DeliveryPublish() {
 
   // 发布需求
   const handlePublish = async () => {
+    if (!userId) {
+      Taro.showToast({ title: '请先登录后再发布', icon: 'none' })
+      return
+    }
     // 验证表单
     if (!pickupLocation) {
       Taro.showToast({ title: '请选择取餐地点', icon: 'none' })

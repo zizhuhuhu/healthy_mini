@@ -1,15 +1,16 @@
 import { View, Text, ScrollView, Input, Button, Image } from '@tarojs/components'
 import { useState, useCallback } from 'react'
-import Taro, { useShareAppMessage, useShareTimeline, useDidShow, switchTab, showToast, showModal } from '@tarojs/taro'
+import { useShareAppMessage, useShareTimeline, useDidShow, navigateTo, showToast } from '@tarojs/taro'
 import { getDormitoryRankings, getUserDormitory, setUserDormitory, getDormitoryMembers } from '@/db/api'
 import type { DormitoryRanking, DormitoryInfo } from '@/db/types'
 import CheckInButton from '@/components/CheckInButton'
+import { getCurrentUserId } from '@/utils/user'
 
 export default function DormitoryChallenge() {
   useShareAppMessage(() => ({ title: '宿舍挑战榜 - 智体云衡' }))
   useShareTimeline(() => ({ title: '宿舍挑战榜 - 智体云衡' }))
 
-  const [userId] = useState(() => Taro.getStorageSync('user_id') || `user_${Date.now()}`)
+  const [userId] = useState(() => getCurrentUserId())
   const [rankings, setRankings] = useState<DormitoryRanking[]>([])
   const [userDorm, setUserDorm] = useState<DormitoryInfo | null>(null)
   const [dormInput, setDormInput] = useState('')
@@ -22,6 +23,11 @@ export default function DormitoryChallenge() {
   })
 
   const loadData = useCallback(async () => {
+    if (!userId) {
+      setRankings([])
+      setUserDorm(null)
+      return
+    }
     const [rankingsData, userDormData] = await Promise.all([
       getDormitoryRankings(),
       getUserDormitory(userId)
@@ -36,6 +42,10 @@ export default function DormitoryChallenge() {
   }, [userId])
 
   const handleSetDormitory = async () => {
+    if (!userId) {
+      showToast({ title: '请先登录后再设置宿舍', icon: 'none' })
+      return
+    }
     if (!dormInput.trim()) {
       showToast({ title: '请输入宿舍名称', icon: 'none' })
       return
@@ -58,7 +68,7 @@ export default function DormitoryChallenge() {
   }
 
   const handleNavigateToHome = () => {
-    switchTab({ url: '/pages/home/index' })
+    navigateTo({ url: '/pages/home/index' })
   }
 
   return (

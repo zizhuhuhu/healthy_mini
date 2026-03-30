@@ -1,14 +1,15 @@
 import { View, Text, Picker, Input, Image, Button } from '@tarojs/components'
 import { useState, useCallback, useEffect } from 'react'
-import Taro, { useShareAppMessage, useShareTimeline, showToast, switchTab, useDidShow } from '@tarojs/taro'
+import Taro, { useShareAppMessage, useShareTimeline, showToast, navigateTo, useDidShow } from '@tarojs/taro'
 import { useTabBarPageClass } from '@/hooks/useTabBarPageClass'
 import { getAllConstitutionTypes, getConstitutionTypeByName } from '@/db/api'
 import type { ConstitutionType } from '@/db/types'
+import { withRouteGuard } from '@/components/RouteGuard'
 import { calculateBMI, getBMICategory, getExerciseRecommendation } from '@/utils/bmi'
 import { saveUserConstitution, type UserConstitutionData } from '@/utils/storage'
 import CheckInButton from '@/components/CheckInButton'
 
-export default function ConstitutionTest() {
+function ConstitutionTest() {
   useTabBarPageClass()
   useShareAppMessage(() => ({ title: '体质测试 - 智体云衡' }))
   useShareTimeline(() => ({ title: '体质测试 - 智体云衡' }))
@@ -103,7 +104,7 @@ export default function ConstitutionTest() {
         <View className="flex flex-row items-center justify-between mb-6">
           <View
             className="flex flex-row items-center bg-card rounded-full px-5 py-2 border border-border shadow-sm"
-            onClick={() => switchTab({ url: '/pages/home/index' })}
+            onClick={() => navigateTo({ url: '/pages/home/index' })}
           >
             <View className="i-mdi-home text-2xl text-primary mr-1" />
             <Text className="text-xl font-medium text-foreground">首页</Text>
@@ -416,3 +417,5 @@ export default function ConstitutionTest() {
     </View>
   );
 }
+
+export default withRouteGuard(ConstitutionTest)

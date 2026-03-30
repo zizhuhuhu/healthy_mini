@@ -1,4 +1,6 @@
 const pages = [
+  'pages/login/index',
+  'pages/profile/index',
   'pages/home/index',
   'pages/constitution-test/index',
   'pages/food-recommend/index',

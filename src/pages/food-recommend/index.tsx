@@ -1,15 +1,16 @@
 import { View, Text, ScrollView, Image, Button } from '@tarojs/components'
 import { useState, useCallback, useEffect, useMemo } from 'react'
-import { useShareAppMessage, useShareTimeline, switchTab } from '@tarojs/taro'
+import { useShareAppMessage, useShareTimeline, switchTab, navigateTo } from '@tarojs/taro'
 import { useTabBarPageClass } from '@/hooks/useTabBarPageClass'
 import { getAllDishes } from '@/db/api'
 import { getConstitutionTypeByName } from '@/db/api'
+import { withRouteGuard } from '@/components/RouteGuard'
 import type { Dish, ConstitutionType } from '@/db/types'
 import { getUserConstitution, hasCompletedTest } from '@/utils/storage'
 import { getRecommendedDishes, type DishRecommendation } from '@/utils/dishMatcher'
 import CheckInButton from '@/components/CheckInButton'
 
-export default function FoodRecommend() {
+function FoodRecommend() {
   useTabBarPageClass()
   useShareAppMessage(() => ({ title: '天中饮食 - 智体云衡' }))
   useShareTimeline(() => ({ title: '天中饮食 - 智体云衡' }))
@@ -98,7 +99,7 @@ export default function FoodRecommend() {
           <View className="flex flex-row items-center justify-between mb-6">
             <View
               className="flex flex-row items-center bg-card rounded-full px-5 py-2 border border-border shadow-sm"
-              onClick={() => switchTab({ url: '/pages/home/index' })}
+              onClick={() => navigateTo({ url: '/pages/home/index' })}
             >
               <View className="i-mdi-home text-2xl text-primary mr-1" />
               <Text className="text-xl font-medium text-foreground">首页</Text>
@@ -321,3 +322,5 @@ export default function FoodRecommend() {
     </View>
   );
 }
+
+export default withRouteGuard(FoodRecommend)

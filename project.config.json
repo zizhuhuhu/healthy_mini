@@ -32,7 +32,12 @@
 		"useCompilerPlugins": false,
 		"minifyWXML": true,
 		"useIsolateContext": true,
-		"ignoreUploadUnusedFiles": true
+		"ignoreUploadUnusedFiles": true,
+		"compileWorklet": false,
+		"localPlugins": false,
+		"condition": false,
+		"swc": false,
+		"disableSWC": true
 	},
 	"compileType": "miniprogram",
 	"srcMiniprogramRoot": "dist/",
@@ -45,5 +50,7 @@
 		"ignore": [],
 		"include": []
 	},
-	"appid": "wx7242b9844a93ca86"
+	"appid": "wx7242b9844a93ca86",
+	"libVersion": "3.15.1",
+	"simulatorPluginLibVersion": {}
 }

@@ -1,8 +1,9 @@
 import { View, Text, ScrollView, Button } from '@tarojs/components'
 import { useState, useCallback } from 'react'
-import { useShareAppMessage, useShareTimeline, showToast, navigateBack, switchTab, navigateTo } from '@tarojs/taro'
+import { useShareAppMessage, useShareTimeline, showToast, navigateBack } from '@tarojs/taro'
 import { activateUserMembership } from '@/db/api'
 import QuickNav from '@/components/QuickNav'
+import { getCurrentUserId } from '@/utils/user'
 
 export default function Membership() {
   useShareAppMessage(() => ({ title: '会员开通 - 智体云衡' }))
@@ -16,7 +17,15 @@ export default function Membership() {
 
     try {
       // 使用测试用户ID
-      const userId = 'test_user_001'
+      const userId = getCurrentUserId()
+      if (!userId) {
+        showToast({
+          title: '请先登录后再开通',
+          icon: 'none',
+          duration: 2000
+        })
+        return
+      }
       const success = await activateUserMembership(userId)
 
       if (success) {

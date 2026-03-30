@@ -1,20 +1,12 @@
 import { View, Text, ScrollView, Button } from '@tarojs/components'
 import { useState, useCallback, useEffect } from 'react'
-import { useShareAppMessage, useShareTimeline, navigateTo, useDidShow, getStorageSync, setStorageSync } from '@tarojs/taro'
+import { useShareAppMessage, useShareTimeline, navigateTo, useDidShow } from '@tarojs/taro'
 import { getUserOrders } from '@/db/api'
 import type { DeliveryOrder } from '@/db/types'
 import QuickNav from '@/components/QuickNav'
+import { getCurrentUserId } from '@/utils/user'
 
 // 生成用户ID（实际应用中应该从登录系统获取）
-const getUserId = () => {
-  let userId = getStorageSync('temp_user_id')
-  if (!userId) {
-    userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
-    setStorageSync('temp_user_id', userId)
-  }
-  return userId
-}
-
 export default function MyOrders() {
   useShareAppMessage(() => ({ title: '我的订单 - 智体云衡' }))
   useShareTimeline(() => ({ title: '我的订单 - 智体云衡' }))
@@ -26,7 +18,12 @@ export default function MyOrders() {
   // 加载订单数据
   const loadOrders = useCallback(async () => {
     setLoading(true)
-    const userId = getUserId()
+    const userId = getCurrentUserId()
+    if (!userId) {
+      setOrders([])
+      setLoading(false)
+      return
+    }
     const allOrders = await getUserOrders(userId, 50)
     setOrders(allOrders)
     setLoading(false)

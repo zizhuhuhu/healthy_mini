@@ -2,19 +2,12 @@ import { View, Text, ScrollView, Button } from '@tarojs/components'
 import { useState, useCallback } from 'react'
 import Taro, { useShareAppMessage, useShareTimeline, useDidShow, navigateTo } from '@tarojs/taro'
 import { useTabBarPageClass } from '@/hooks/useTabBarPageClass'
+import { withRouteGuard } from '@/components/RouteGuard'
 import { getOrCreateDeliveryUser, getDeliveryExpressOrders, acceptDeliveryExpressOrder } from '@/db/deliveryApi'
 import type { DeliveryUser, DeliveryExpressOrder } from '@/db/types'
+import { getCurrentUserId } from '@/utils/user'
 
 // 生成用户ID
-const getUserId = () => {
-  let userId = Taro.getStorageSync('temp_user_id')
-  if (!userId) {
-    userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
-    Taro.setStorageSync('temp_user_id', userId)
-  }
-  return userId
-}
-
 // 信用等级配置
 const CREDIT_LEVELS = {
   bronze: { name: '青铜', color: '#CD7F32', icon: 'i-mdi-medal' },
@@ -24,18 +17,23 @@ const CREDIT_LEVELS = {
   diamond: { name: '钻石', color: '#B9F2FF', icon: 'i-mdi-diamond-stone' }
 }
 
-export default function DeliveryExpress() {
+function DeliveryExpress() {
   useTabBarPageClass()
   useShareAppMessage(() => ({ title: '饮食速递 - 校园互助送餐' }))
   useShareTimeline(() => ({ title: '饮食速递 - 校园互助送餐' }))
 
-  const [userId] = useState(() => getUserId())
+  const [userId] = useState(() => getCurrentUserId())
   const [userInfo, setUserInfo] = useState<DeliveryUser | null>(null)
   const [pendingOrders, setPendingOrders] = useState<DeliveryExpressOrder[]>([])
   const [loading, setLoading] = useState(false)
 
   // 加载数据
   const loadData = useCallback(async () => {
+    if (!userId) {
+      setUserInfo(null)
+      setPendingOrders([])
+      return
+    }
     setLoading(true)
     try {
       // 加载用户信用信息
@@ -67,6 +65,10 @@ export default function DeliveryExpress() {
 
   // 接单
   const handleAcceptOrder = async (orderId: string) => {
+    if (!userId) {
+      Taro.showToast({ title: '请先登录后再接单', icon: 'none' })
+      return
+    }
     const result = await acceptDeliveryExpressOrder(orderId, userId)
     Taro.showToast({
       title: result.message,
@@ -270,3 +272,5 @@ export default function DeliveryExpress() {
     </View>
   )
 }
+
+export default withRouteGuard(DeliveryExpress)

@@ -1,19 +1,13 @@
 import { View, Text, ScrollView, Button } from '@tarojs/components'
 import { useState, useCallback, useEffect } from 'react'
-import { useShareAppMessage, useShareTimeline, showToast, useDidShow, getStorageSync, setStorageSync } from '@tarojs/taro'
+import { useShareAppMessage, useShareTimeline, showToast, useDidShow } from '@tarojs/taro'
 import { getPendingOrders, acceptOrder, getCourierOrders, getCourierEarnings } from '@/db/api'
 import type { DeliveryOrder } from '@/db/types'
 import QuickNav from '@/components/QuickNav'
+import { getCurrentUserId } from '@/utils/user'
 
 // 生成跑腿ID（实际应用中应该从登录系统获取）
-const getCourierId = () => {
-  let courierId = getStorageSync('temp_courier_id')
-  if (!courierId) {
-    courierId = 'courier_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
-    setStorageSync('temp_courier_id', courierId)
-  }
-  return courierId
-}
+const getCourierId = () => getCurrentUserId()
 
 export default function CourierCenter() {
   useShareAppMessage(() => ({ title: '接单中心 - 智体云衡' }))
@@ -29,6 +23,13 @@ export default function CourierCenter() {
   const loadData = useCallback(async () => {
     setLoading(true)
     const courierId = getCourierId()
+    if (!courierId) {
+      setPendingOrders([])
+      setMyOrders([])
+      setEarnings({ total: 0, records: [] })
+      setLoading(false)
+      return
+    }
 
     if (activeTab === 'pending') {
       // 加载待接单订单
@@ -58,6 +59,14 @@ export default function CourierCenter() {
   // 接单
   const handleAcceptOrder = async (orderId: string) => {
     const courierId = getCourierId()
+    if (!courierId) {
+      showToast({
+        title: '请先登录后再接单',
+        icon: 'none',
+        duration: 2000
+      })
+      return
+    }
     
     showToast({
       title: '接单中...',

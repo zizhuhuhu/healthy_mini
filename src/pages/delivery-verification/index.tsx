@@ -3,22 +3,14 @@ import { useState } from 'react'
 import Taro, { useShareAppMessage, useShareTimeline, useDidShow, navigateBack } from '@tarojs/taro'
 import { getOrCreateDeliveryUser, submitVerification } from '@/db/deliveryApi'
 import type { DeliveryUser } from '@/db/types'
+import { getCurrentUserId } from '@/utils/user'
 
 // 生成用户ID
-const getUserId = () => {
-  let userId = Taro.getStorageSync('temp_user_id')
-  if (!userId) {
-    userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
-    Taro.setStorageSync('temp_user_id', userId)
-  }
-  return userId
-}
-
 export default function DeliveryVerification() {
   useShareAppMessage(() => ({ title: '实名校园认证 - 饮食速递' }))
   useShareTimeline(() => ({ title: '实名校园认证 - 饮食速递' }))
 
-  const [userId] = useState(() => getUserId())
+  const [userId] = useState(() => getCurrentUserId())
   const [userInfo, setUserInfo] = useState<DeliveryUser | null>(null)
   const [realName, setRealName] = useState('')
   const [studentId, setStudentId] = useState('')
@@ -29,6 +21,9 @@ export default function DeliveryVerification() {
 
   // 加载用户信息
   useDidShow(async () => {
+    if (!userId) {
+      return
+    }
     const user = await getOrCreateDeliveryUser(userId)
     setUserInfo(user)
     
@@ -49,6 +44,10 @@ export default function DeliveryVerification() {
 
   // 提交认证
   const handleSubmit = async () => {
+    if (!userId) {
+      Taro.showToast({ title: '请先登录后再认证', icon: 'none' })
+      return
+    }
     // 验证表单
     if (!realName.trim()) {
       Taro.showToast({ title: '请输入真实姓名', icon: 'none' })

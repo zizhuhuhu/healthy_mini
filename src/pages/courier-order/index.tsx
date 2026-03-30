@@ -1,19 +1,11 @@
 import { View, Text, ScrollView, Button, Input, Textarea, Picker } from '@tarojs/components'
 import { useState } from 'react'
-import { useShareAppMessage, useShareTimeline, showToast, navigateTo, getStorageSync, setStorageSync } from '@tarojs/taro'
+import { useShareAppMessage, useShareTimeline, showToast, navigateTo, switchTab } from '@tarojs/taro'
 import { createDeliveryOrder } from '@/db/api'
 import QuickNav from '@/components/QuickNav'
+import { getCurrentUserId } from '@/utils/user'
 
 // 生成用户ID（实际应用中应该从登录系统获取）
-const getUserId = () => {
-  let userId = getStorageSync('temp_user_id')
-  if (!userId) {
-    userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
-    setStorageSync('temp_user_id', userId)
-  }
-  return userId
-}
-
 // 食堂列表
 const canteens = [
   '五味食堂1楼',
@@ -86,7 +78,11 @@ export default function CourierOrder() {
     })
 
     // 创建订单
-    const userId = getUserId()
+    const userId = getCurrentUserId()
+    if (!userId) {
+      showToast({ title: '请先登录后再下单', icon: 'none', duration: 2000 })
+      return
+    }
     const dishNamesArray = dishNames.split(/[,，、]/).map(d => d.trim()).filter(d => d)
     
     const order = await createDeliveryOrder({
@@ -129,7 +125,7 @@ export default function CourierOrder() {
 
   // 取消
   const handleCancel = () => {
-    navigateTo({ url: '/pages/delivery-express/index' })
+    switchTab({ url: '/pages/delivery-express/index' })
   }
 
   return (

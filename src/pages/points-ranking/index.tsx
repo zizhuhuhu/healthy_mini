@@ -1,20 +1,12 @@
 import { View, Text, ScrollView } from '@tarojs/components'
 import { useState, useCallback, useEffect } from 'react'
-import { useShareAppMessage, useShareTimeline, useDidShow, switchTab, getStorageSync, setStorageSync } from '@tarojs/taro'
+import { useShareAppMessage, useShareTimeline, useDidShow, navigateTo } from '@tarojs/taro'
 import { getPointsRanking, getUserPoints } from '@/db/api'
 import type { UserPoints } from '@/db/types'
 import CheckInButton from '@/components/CheckInButton'
+import { getCurrentUserId } from '@/utils/user'
 
 // 生成用户ID
-const getUserId = () => {
-  let userId = getStorageSync('temp_user_id')
-  if (!userId) {
-    userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
-    setStorageSync('temp_user_id', userId)
-  }
-  return userId
-}
-
 export default function PointsRanking() {
   useShareAppMessage(() => ({ title: '积分排行榜 - 智体云衡' }))
   useShareTimeline(() => ({ title: '积分排行榜 - 智体云衡' }))
@@ -26,7 +18,12 @@ export default function PointsRanking() {
   // 加载排行榜数据
   const loadRankings = useCallback(async () => {
     setLoading(true)
-    const userId = getUserId()
+    const userId = getCurrentUserId()
+    if (!userId) {
+      setMyPoints(null)
+      setLoading(false)
+      return
+    }
     
     // 获取排行榜（使用user_score字段）
     const rankingData = await getPointsRanking(100)
@@ -77,13 +74,14 @@ export default function PointsRanking() {
   // 获取我的排名
   const getMyRank = () => {
     if (!myPoints) return null
-    const userId = getUserId()
+    const userId = getCurrentUserId()
+    if (!userId) return null
     const index = rankings.findIndex(r => r.user_id === userId)
     return index >= 0 ? index + 1 : null
   }
 
   // 积分更新回调
-  const handlePointsUpdate = (points: number) => {
+  const handlePointsUpdate = (_points: number) => {
     loadRankings()
   }
 
@@ -95,7 +93,7 @@ export default function PointsRanking() {
           <View className="flex flex-row items-center justify-between mb-6">
             <View
               className="flex flex-row items-center bg-card rounded-full px-5 py-2 border border-border shadow-sm"
-              onClick={() => switchTab({ url: '/pages/home/index' })}
+              onClick={() => navigateTo({ url: '/pages/home/index' })}
             >
               <View className="i-mdi-arrow-left text-2xl text-foreground mr-1" />
               <Text className="text-xl font-medium text-foreground">返回</Text>
@@ -150,7 +148,7 @@ export default function PointsRanking() {
             <View className="flex flex-col space-y-3">
               {rankings.slice(0, 10).map((user, index) => {
                 const rank = index + 1
-                const isMyself = user.user_id === getUserId()
+                const isMyself = user.user_id === getCurrentUserId()
                 
                 return (
                   <View

@@ -4,6 +4,8 @@ import Taro, { useShareAppMessage, useShareTimeline, useDidShow, navigateTo, swi
 import { hasCompletedTest } from '@/utils/storage'
 import { recordWeight, getUserWeightRecords, getUserWeightStats } from '@/db/api'
 import type { WeightRecord, WeightCheckinStats } from '@/db/types'
+import { withRouteGuard } from '@/components/RouteGuard'
+import { getCurrentUserId } from '@/utils/user'
 import WeightChart from '@/components/WeightChart'
 import {
   saveWeightRecordLocal,
@@ -16,11 +18,11 @@ import {
   clearCorruptedData
 } from '@/utils/weightStorage'
 
-export default function WeightLab() {
+function WeightLab() {
   useShareAppMessage(() => ({ title: '健康实验室 - 智体云衡' }))
   useShareTimeline(() => ({ title: '健康实验室 - 智体云衡' }))
 
-  const [userId] = useState(() => Taro.getStorageSync('user_id') || `user_${Date.now()}`)
+  const [userId] = useState(() => getCurrentUserId())
   const [weight, setWeight] = useState('')
   const [loading, setLoading] = useState(false)
   const [records, setRecords] = useState<WeightRecord[]>([])
@@ -34,7 +36,7 @@ export default function WeightLab() {
       title: '同学你好！',
       content: '想更科学地管理体重吗？先花1分钟建立你的专属"体质档案"吧～',
       confirmText: '立即测试',
-      cancelText: '跳过，直接记录',
+      cancelText: '跳过',
       success: (res) => {
         if (res.confirm) {
           // 立即测试：跳转到体质测试
@@ -45,7 +47,7 @@ export default function WeightLab() {
             title: '提示',
             content: '你最近是否完成过体质测试？（比如体育课的体测）',
             confirmText: '是',
-            cancelText: '否/不确定',
+            cancelText: '否',
             success: (res2) => {
               if (res2.confirm) {
                 // 选择"是"：引导输入体重（不做任何操作，用户可以直接在页面上输入）
@@ -60,7 +62,7 @@ export default function WeightLab() {
                   title: '温馨提示',
                   content: '建议先完成测试，结果能帮你更好设定目标哦！',
                   confirmText: '先去测试',
-                  cancelText: '暂不测试，直接记录',
+                  cancelText: '暂不测试',
                   success: (res3) => {
                     if (res3.confirm) {
                       // 先去测试
@@ -103,6 +105,10 @@ export default function WeightLab() {
 
   // 检查是否有待同步的记录
   const checkPendingSync = useCallback(async () => {
+    if (!userId) {
+      setHasPendingSync(false)
+      return
+    }
     const pendingRecords = getPendingSyncRecords(userId)
     if (pendingRecords.length > 0) {
       setHasPendingSync(true)
@@ -123,6 +129,9 @@ export default function WeightLab() {
 
   // 同步待同步的记录
   const syncPendingRecords = useCallback(async () => {
+    if (!userId) {
+      return
+    }
     const pendingRecords = getPendingSyncRecords(userId)
     if (pendingRecords.length === 0) {
       console.log('✓ 无待同步记录')
@@ -186,6 +195,11 @@ export default function WeightLab() {
 
   // 加载数据（优先从本地加载，然后异步请求云端）
   const loadData = useCallback(async () => {
+    if (!userId) {
+      setRecords([])
+      setStats(null)
+      return
+    }
     console.log('=== 开始加载体重数据 ===')
     
     // 0. 验证本地数据完整性
@@ -270,6 +284,10 @@ export default function WeightLab() {
   }
 
   const handleRecordWeight = async () => {
+    if (!userId) {
+      showToast({ title: '请先登录后再打卡', icon: 'none', duration: 2000 })
+      return
+    }
     if (!weight || isNaN(Number(weight))) {
       showToast({ title: '请输入有效的体重', icon: 'none' })
       return
@@ -673,3 +691,5 @@ export default function WeightLab() {
     </View>
   )
 }
+
+export default withRouteGuard(WeightLab)

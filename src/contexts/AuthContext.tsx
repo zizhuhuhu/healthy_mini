@@ -1,6 +1,7 @@
 import {createContext, useContext, useEffect, useState, type ReactNode} from 'react'
 import Taro from '@tarojs/taro'
 import {supabase} from '@/client/supabase'
+import {cacheUserId, clearCachedUserId} from '@/utils/user'
 import type {User} from '@supabase/supabase-js'
 
 export interface Profile {
@@ -54,7 +55,10 @@ export function AuthProvider({children}: {children: ReactNode}) {
       .then(({data: {session}}) => {
         setUser(session?.user ?? null)
         if (session?.user) {
+          cacheUserId(session.user.id)
           getProfile(session.user.id).then(setProfile)
+        } else {
+          clearCachedUserId()
         }
         setLoading(false)
       })
@@ -62,6 +66,7 @@ export function AuthProvider({children}: {children: ReactNode}) {
         console.warn('Failed to get session:', error)
         setUser(null)
         setProfile(null)
+        clearCachedUserId()
         setLoading(false)
       })
 
@@ -71,9 +76,11 @@ export function AuthProvider({children}: {children: ReactNode}) {
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
       if (session?.user) {
+        cacheUserId(session.user.id)
         getProfile(session.user.id).then(setProfile)
       } else {
         setProfile(null)
+        clearCachedUserId()
       }
     })
 
@@ -186,6 +193,7 @@ export function AuthProvider({children}: {children: ReactNode}) {
     await supabase.auth.signOut()
     setUser(null)
     setProfile(null)
+    clearCachedUserId()
   }
 
   return (

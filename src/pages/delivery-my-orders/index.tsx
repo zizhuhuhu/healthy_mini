@@ -1,19 +1,11 @@
 import { View, Text, ScrollView, Button } from '@tarojs/components'
 import { useState, useCallback } from 'react'
-import Taro, { useShareAppMessage, useShareTimeline, useDidShow, navigateTo, navigateBack } from '@tarojs/taro'
+import { useShareAppMessage, useShareTimeline, useDidShow, navigateTo, navigateBack } from '@tarojs/taro'
 import { getUserDeliveryExpressOrders } from '@/db/deliveryApi'
 import type { DeliveryExpressOrder } from '@/db/types'
+import { getCurrentUserId } from '@/utils/user'
 
 // 生成用户ID
-const getUserId = () => {
-  let userId = Taro.getStorageSync('temp_user_id')
-  if (!userId) {
-    userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
-    Taro.setStorageSync('temp_user_id', userId)
-  }
-  return userId
-}
-
 // 订单状态配置
 const ORDER_STATUS = {
   pending: { name: '待接单', color: 'text-yellow-600', bgColor: 'bg-yellow-100' },
@@ -27,7 +19,7 @@ export default function DeliveryMyOrders() {
   useShareAppMessage(() => ({ title: '我的订单 - 饮食速递' }))
   useShareTimeline(() => ({ title: '我的订单 - 饮食速递' }))
 
-  const [userId] = useState(() => getUserId())
+  const [userId] = useState(() => getCurrentUserId())
   const [activeTab, setActiveTab] = useState<'requested' | 'helped'>('requested')
   const [requestedOrders, setRequestedOrders] = useState<DeliveryExpressOrder[]>([])
   const [helpedOrders, setHelpedOrders] = useState<DeliveryExpressOrder[]>([])
@@ -35,6 +27,11 @@ export default function DeliveryMyOrders() {
 
   // 加载订单数据
   const loadOrders = useCallback(async () => {
+    if (!userId) {
+      setRequestedOrders([])
+      setHelpedOrders([])
+      return
+    }
     setLoading(true)
     try {
       const { requested, helped } = await getUserDeliveryExpressOrders(userId)

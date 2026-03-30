@@ -2,31 +2,28 @@ import { View, Text } from '@tarojs/components'
 import { useState, useEffect, useCallback } from 'react'
 import Taro from '@tarojs/taro'
 import { supabase } from '@/client/supabase'
+import { getCurrentUserId } from '@/utils/user'
 
 interface CheckInButtonProps {
   onPointsUpdate?: (points: number) => void
 }
 
 // 生成用户ID
-const getUserId = () => {
-  let userId = Taro.getStorageSync('temp_user_id')
-  if (!userId) {
-    userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
-    Taro.setStorageSync('temp_user_id', userId)
-  }
-  return userId
-}
-
 export default function CheckInButton({ onPointsUpdate }: CheckInButtonProps) {
   const [hasCheckedIn, setHasCheckedIn] = useState(false)
   const [loading, setLoading] = useState(false)
   const [checking, setChecking] = useState(true)
 
-  const userId = getUserId()
+  const userId = getCurrentUserId()
 
   // 检查今日是否已签到
   const checkTodayStatus = useCallback(async () => {
     setChecking(true)
+    if (!userId) {
+      setHasCheckedIn(false)
+      setChecking(false)
+      return
+    }
     try {
       const today = new Date().toISOString().split('T')[0]
       
@@ -59,6 +56,14 @@ export default function CheckInButton({ onPointsUpdate }: CheckInButtonProps) {
   // 处理签到
   const handleCheckIn = async () => {
     if (loading) return
+    if (!userId) {
+      Taro.showToast({
+        title: '请先登录后再签到',
+        icon: 'none',
+        duration: 2000
+      })
+      return
+    }
 
     setLoading(true)
     try {
